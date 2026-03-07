@@ -1,75 +1,79 @@
 import net from "net";
 
-function check(host, port){
-  return new Promise((resolve)=>{
+const project="vless-panel";
 
-    const start = Date.now();
-    const socket = new net.Socket();
+async function getServers(){
 
-    socket.setTimeout(3000);
+const url=`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/vpn_keys`;
 
-    socket.connect(port, host, ()=>{
+const res=await fetch(url);
+const data=await res.json();
 
-      const ping = Date.now() - start;
+let servers=[];
 
-      socket.destroy();
+if(data.documents){
 
-      resolve({
-        status:"online",
-        ping: ping
-      });
+for(let doc of data.documents){
 
-    });
+let f=doc.fields;
 
-    socket.on("error", ()=>{
-      resolve({
-        status:"offline",
-        ping:null
-      });
-    });
+let key=f.key.stringValue;
+let name=f.name.stringValue;
 
-    socket.on("timeout", ()=>{
-      socket.destroy();
-      resolve({
-        status:"offline",
-        ping:null
-      });
-    });
+try{
 
-  });
+const u=new URL(key);
+
+servers.push({
+name,
+host:u.hostname,
+port:parseInt(u.port || 443)
+});
+
+}catch{}
+
 }
 
-export default async function handler(req,res){
-
-const servers=[
-
-{
-name:"Germany 1",
-host:"194.87.25.230",
-port:443
-},
-
-{
-name:"Germany 2",
-host:"194.87.25.231",
-port:443
 }
 
-];
+return servers;
 
-let result=[];
+}
 
-for(let s of servers){
+function check(host,port){
 
-const r = await check(s.host,s.port);
+return new Promise(resolve=>{
 
-result.push({
-...s,
-...r
+const start=Date.now();
+
+const socket=new net.Socket();
+
+socket.setTimeout(3000);
+
+socket.connect(port,host,()=>{
+
+const ping=Date.now()-start;
+
+socket.destroy();
+
+resolve({
+status:"online",
+ping
+});
+
+});
+
+socket.on("error",()=>{
+resolve({status:"offline",ping:null});
+});
+
+socket.on("timeout",()=>{
+socket.destroy();
+resolve({status:"offline",ping:null});
+});
+
 });
 
 }
 
-res.json(result);
-
-}
+export default async fu
