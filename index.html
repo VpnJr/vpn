@@ -1,40 +1,38 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <link rel="icon" href="logo.ico" type="image/x-icon">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VPN Keys</title>
+  <link rel="icon" href="logo.ico" type="image/x-icon">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  
-<header class="site-header">
-  <div class="logo">
-    <img src="logo.png" alt="Логотип" />
-    <span class="site-title">JR VPN </span>
-  </div>
-  <nav class="site-nav">
-    <!-- Кнопки можно добавлять сюда -->
-    <!-- <button>Настройки</button> -->
-  </nav>
-</header>
 
+  <header class="site-header">
+    <div class="logo">
+      <img src="logo.png" alt="Логотип" />
+      <span class="site-title">JR VPN</span>
+    </div>
+    <nav class="site-nav">
+      <!-- Кнопки можно добавлять сюда -->
+      <!-- <button>Настройки</button> -->
+    </nav>
+  </header>
 
-  <h1>Список VPN ключей</h1>
+  <main>
+    <h1>Список VPN ключей</h1>
+    <div id="vpn-list">Загрузка...</div>
 
-  <div id="vpn-list">Загрузка...</div>
+    <section class="downloads">
+      <h2>VPN Клиенты</h2>
+      <p>Выберите приложение для вашего устройства</p>
+      <div id="apps-list" class="apps-list">Загрузка...</div>
+    </section>
+  </main>
 
-<div class="downloads">
-  <h2>VPN Клиенты</h2>
-  <p>Выберите приложение для вашего устройства</p>
-
-  <div id="apps-list" class="apps-list">
-    Загрузка...</div>
-</div>
-
-
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK и основной скрипт -->
   <script type="module" src="script.js"></script>
+  
 </body>
 </html>
