@@ -44,7 +44,6 @@ async function loadKeys() {
 
   snapshot.forEach(doc => {
     const data = doc.data();
-
     const card = document.createElement("div");
     card.className = "card";
 
@@ -57,7 +56,6 @@ async function loadKeys() {
     const btn = document.createElement("button");
     btn.className = "action-btn";
     btn.textContent = "Скопировать";
-
     btn.onclick = async () => {
       await navigator.clipboard.writeText(data.key);
       btn.textContent = "✓";
@@ -107,15 +105,12 @@ async function loadApps() {
 
   snapshot.forEach(doc => {
     const app = doc.data();
-
     const card = document.createElement("div");
     card.className = "app-card";
 
     const icon = document.createElement("div");
     icon.className = "app-icon";
-    icon.innerHTML = app.icon
-      ? `<img src="${app.icon}" alt="${app.name}">`
-      : "📦";
+    icon.innerHTML = app.icon ? `<img src="${app.icon}" alt="${app.name}">` : "📦";
 
     const info = document.createElement("div");
     info.className = "app-info";
