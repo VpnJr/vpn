@@ -105,44 +105,75 @@ async function loadApps() {
     return;
   }
 
+  // Группировка по платформам
+  const platforms = {
+    iOS: [],
+    Android: [],
+    "Windows/MacOS": []
+  };
+
   snapshot.forEach(doc => {
     const app = doc.data();
-
-    const card = document.createElement("div");
-    card.className = "app-card";
-
-    const icon = document.createElement("div");
-    icon.className = "app-icon";
-    icon.innerHTML = app.icon
-      ? `<img src="${app.icon}" alt="${app.name}">`
-      : "📦";
-
-    const info = document.createElement("div");
-    info.className = "app-info";
-    info.innerHTML = `
-      <div class="app-name">${app.name}</div>
-      <div class="app-platform">${app.platform}</div>
-    `;
-
-    const btn = document.createElement("button");
-    btn.className = "action-btn";
-    btn.textContent = "Скачать";
-    btn.onclick = () => {
-      btn.textContent = "✔️";
-      btn.classList.add("success");
-      window.open(app.url, "_blank");
-      setTimeout(() => {
-        btn.textContent = "Скачать";
-        btn.classList.remove("success");
-      }, 1200);
-    };
-
-    card.appendChild(icon);
-    card.appendChild(info);
-    card.appendChild(btn);
-    appsList.appendChild(card);
+    if (platforms[app.platform]) {
+      platforms[app.platform].push(app);
+    }
   });
+
+  // Создаём блок для каждой платформы
+  for (const [platformName, apps] of Object.entries(platforms)) {
+    if (apps.length === 0) continue; // пропускаем пустые
+
+    const platformBlock = document.createElement("div");
+    platformBlock.className = "device-block";
+
+    const title = document.createElement("h3");
+    title.textContent = platformName;
+    platformBlock.appendChild(title);
+
+    const appsContainer = document.createElement("div");
+    appsContainer.className = "apps-icons";
+
+    apps.forEach(app => {
+      const card = document.createElement("div");
+      card.className = "app-card";
+
+      const icon = document.createElement("div");
+      icon.className = "app-icon";
+      icon.innerHTML = app.icon
+        ? `<img src="${app.icon}" alt="${app.name}">`
+        : "📦";
+
+      const info = document.createElement("div");
+      info.className = "app-info";
+      info.innerHTML = `
+        <div class="app-name">${app.name}</div>
+        <div class="app-platform">${app.platform}</div>
+      `;
+
+      const btn = document.createElement("button");
+      btn.className = "action-btn";
+      btn.textContent = "Скачать";
+      btn.onclick = () => {
+        btn.textContent = "✔️";
+        btn.classList.add("success");
+        window.open(app.url, "_blank");
+        setTimeout(() => {
+          btn.textContent = "Скачать";
+          btn.classList.remove("success");
+        }, 1200);
+      };
+
+      card.appendChild(icon);
+      card.appendChild(info);
+      card.appendChild(btn);
+      appsContainer.appendChild(card);
+    });
+
+    platformBlock.appendChild(appsContainer);
+    appsList.appendChild(platformBlock);
+  }
 }
+
 
 /* ===== Load data ===== */
 loadKeys();
