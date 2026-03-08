@@ -107,50 +107,63 @@ h1 {
 
 /* ===== Блок скачивания ===== */
 .downloads .devices {
+  {
   display: flex;
-  gap: 20px;
-  justify-content: space-around;
-  flex-wrap: wrap;
-}
-
-.device-block {
-  text-align: center;
-  flex: 1 1 250px;
+  flex-direction: column;
+  gap: 20px; /* расстояние между платформами */
 }
 
 .device-block h3 {
   margin-bottom: 10px;
+  color: white;
 }
 
 .apps-icons {
   display: flex;
   gap: 15px;
   flex-wrap: wrap;
-  justify-content: center;
 }
 
-.apps-icons a {
+.app-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #1f2937;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.app-icon img {
+  width: 50px;
+  height: 50px;
+}
+
+.app-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-decoration: none;
-  color: inherit;
 }
 
-.apps-icons img {
-  width: 60px;
-  height: 60px;
-  margin-bottom: 5px;
+.app-name {
+  font-weight: bold;
+}
+
+.action-btn {
+  margin-left: auto;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #60a5fa, #3b82f6);
+  color: white;
   cursor: pointer;
   transition: transform 0.2s;
 }
 
-.apps-icons img:hover {
-  transform: scale(1.1);
+.action-btn.success {
+  background: #10b981;
 }
 
-.apps-icons span {
-  font-size: 14px;
+.action-btn:hover {
+  transform: scale(1.05);
 }
 
 
