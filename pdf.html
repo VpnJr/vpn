@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDFix — Онлайн PDF-конвертер</title>
+<title>PDFbyJR — Онлайн PDF-конвертер</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
@@ -831,7 +831,7 @@
 
 <!-- FOOTER -->
 <footer>
-  <strong>PDFix</strong> — бесплатный онлайн PDF-конвертер &nbsp;·&nbsp; 2024
+  <strong>PDFbyJR</strong> — бесплатный онлайн PDF-конвертер &nbsp;·&nbsp; 2024
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -1113,7 +1113,7 @@ async function convert(file, tool, fmt) {
 
   // Watermark PDF
   if (tool === 'watermark') {
-    const blob = await watermarkPdf(file, 'PDFix');
+    const blob = await watermarkPdf(file, 'PDFbyJR');
     return { blob, filename: baseName + '_watermarked.pdf' };
   }
 
