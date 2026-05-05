@@ -399,7 +399,7 @@ input[type=color].wm-input{padding:2px;height:34px;cursor:pointer}
 
     <div class="action-row" id="actionRow" style="display:none">
       <button class="btn-convert" onclick="startConvert()">Сохранить / Конвертировать</button>
-      <button class="btn-add-more" onclick="document.getElementById('file-input').click()">+ Файл</button>
+      <button class="btn-add-more" onclick="triggerAddMore()">+ Файл</button>
     </div>
 
     <div class="features-grid" id="featuresBlock">
@@ -532,7 +532,8 @@ function activateTool(tool, sbEl) {
   if (sbEl) sbEl.classList.add('active');
   const fi = document.getElementById('file-input');
   fi.accept = cfg.accept;
-  fi.multiple = !!cfg.multi;
+  // allow multiple for merge and image-to-pdf
+  fi.multiple = !!(cfg.multi || tool === 'jpg-to-pdf');
   document.getElementById('panelIcon').textContent = cfg.icon;
   document.getElementById('panelTitle').textContent = cfg.title;
   buildFmtBtns(cfg.fmts);
@@ -568,9 +569,25 @@ function handleFiles(files) {
   if (ext !== 'pdf' && autoMap[ext] && curTool.startsWith('pdf-to')) {
     curTool = autoMap[ext]; activateTool(curTool, null);
   }
-  selFiles = TOOLS[curTool].multi ? [...selFiles, ...files] : [f];
+
+  const cfg = TOOLS[curTool];
+  // treat jpg-to-pdf as multi-capable too
+  const isMultiCapable = cfg.multi || curTool === 'jpg-to-pdf';
+  const isAdding = isMultiCapable && selFiles.length > 0;
+
+  if (isMultiCapable) {
+    selFiles = [...selFiles, ...files];
+  } else {
+    selFiles = [f];
+  }
+
   showPanel();
-  loadThumbnails();
+
+  if (isAdding) {
+    appendNewFilesToThumbs(Array.from(files));
+  } else {
+    loadThumbnails();
+  }
 }
 
 function showPanel() {
@@ -597,12 +614,20 @@ async function loadThumbnails() {
   loadEl.style.display = 'block';
   document.getElementById('tprogFill').style.width = '0%';
 
+  const cfg = TOOLS[curTool];
+
+  // Multi-file mode (merge, jpg-to-pdf with multiple images)
+  if (cfg.multi || selFiles.length > 1) {
+    await loadMultiFileThumbs(grid, loadEl, selFiles);
+    return;
+  }
+
   const file = selFiles[0];
   const ext = file.name.split('.').pop().toLowerCase();
 
   if (ext !== 'pdf') {
     loadEl.style.display = 'none';
-    document.getElementById('thumbCount').textContent = '1 стр.';
+    document.getElementById('thumbCount').textContent = '1 файл';
     if (['jpg','jpeg','png','gif','bmp','tiff'].includes(ext)) {
       const dataUrl = await fileToDataUrl(file);
       const img = await loadImg(dataUrl);
@@ -610,10 +635,13 @@ async function loadThumbnails() {
       thumbData = [{canvas:c, vCanvas:c2}];
       pageOrder = [0]; pageRotations = [0];
       appendThumb(grid, c, 0, 1);
+      document.getElementById('thumbHint').style.display = 'flex';
+      setupDragReorder(grid);
     }
     return;
   }
 
+  // Single PDF
   try {
     const ab = await file.arrayBuffer();
     pdfDoc = await pdfjsLib.getDocument({data:ab}).promise;
@@ -642,6 +670,147 @@ async function loadThumbnails() {
   } catch(e) {
     loadEl.innerHTML = `<div style="color:var(--red)">Ошибка: ${e.message}</div>`;
   }
+}
+
+// Load thumbnails for multiple files (merge / multi-image)
+async function loadMultiFileThumbs(grid, loadEl, files) {
+  loadEl.style.display = 'block';
+  const imgExts = ['jpg','jpeg','png','gif','bmp','tiff'];
+
+  for (let fi = 0; fi < files.length; fi++) {
+    const file = files[fi];
+    const ext = file.name.split('.').pop().toLowerCase();
+    const startIdx = thumbData.length;
+
+    if (imgExts.includes(ext)) {
+      // Image file
+      const dataUrl = await fileToDataUrl(file);
+      const img = await loadImg(dataUrl);
+      const c = mkCanvas(img, 100); const c2 = mkCanvas(img, 110);
+      const idx = thumbData.length;
+      thumbData.push({canvas:c, vCanvas:c2, fileIdx:fi});
+      pageOrder.push(idx); pageRotations.push(0);
+      appendThumbMulti(grid, c, idx, file.name, fi);
+    } else if (ext === 'pdf') {
+      // PDF file - render all pages
+      try {
+        const ab = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data:ab}).promise;
+        for (let pi = 1; pi <= pdf.numPages; pi++) {
+          const page = await pdf.getPage(pi);
+          const vp1 = page.getViewport({scale:.22}), vp2 = page.getViewport({scale:.19});
+          const c1 = document.createElement('canvas'); c1.width=vp1.width; c1.height=vp1.height;
+          await page.render({canvasContext:c1.getContext('2d'),viewport:vp1}).promise;
+          const c2 = document.createElement('canvas'); c2.width=vp2.width; c2.height=vp2.height;
+          await page.render({canvasContext:c2.getContext('2d'),viewport:vp2}).promise;
+          const idx = thumbData.length;
+          thumbData.push({canvas:c1, vCanvas:c2, fileIdx:fi, pageNum:pi});
+          pageOrder.push(idx); pageRotations.push(0);
+          appendThumbMulti(grid, c1, idx, `${file.name} — стр. ${pi}`, fi);
+          if (pi % 4 === 0) await yld();
+        }
+      } catch(e) { console.error('PDF load error:', e); }
+    }
+
+    document.getElementById('tprogFill').style.width = `${Math.round((fi+1)/files.length*100)}%`;
+    document.getElementById('tprogLabel').textContent = `${fi+1} / ${files.length} файл(ов)`;
+  }
+
+  document.getElementById('thumbCount').textContent = `${thumbData.length} стр. · ${files.length} файл(ов)`;
+  loadEl.style.display = 'none';
+  document.getElementById('thumbHint').style.display = 'flex';
+  setupDragReorder(grid);
+  updatePanelMeta();
+}
+
+// Append to existing thumbnails when adding more files
+async function appendNewFilesToThumbs(newFiles) {
+  const grid = document.getElementById('thumbsGrid');
+  const imgExts = ['jpg','jpeg','png','gif','bmp','tiff'];
+  const fi_start = selFiles.length - newFiles.length;
+
+  // Show mini loading indicator
+  const addingMsg = document.createElement('div');
+  addingMsg.style.cssText = 'padding:.5rem 1rem;font-size:.75rem;color:var(--muted);border-top:1px solid var(--border);display:flex;align-items:center;gap:.5rem';
+  addingMsg.innerHTML = '<span style="animation:spin .7s linear infinite;display:inline-block;font-size:.8rem">↻</span> Добавляем файлы...';
+  document.getElementById('thumbsWrap').appendChild(addingMsg);
+
+  for (let ni = 0; ni < newFiles.length; ni++) {
+    const file = newFiles[ni];
+    const ext = file.name.split('.').pop().toLowerCase();
+    const fi = fi_start + ni;
+
+    if (imgExts.includes(ext)) {
+      const dataUrl = await fileToDataUrl(file);
+      const img = await loadImg(dataUrl);
+      const c = mkCanvas(img, 100); const c2 = mkCanvas(img, 110);
+      const idx = thumbData.length;
+      thumbData.push({canvas:c, vCanvas:c2, fileIdx:fi});
+      pageOrder.push(idx); pageRotations.push(0);
+      appendThumbMulti(grid, c, idx, file.name, fi);
+    } else if (ext === 'pdf') {
+      try {
+        const ab = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data:ab}).promise;
+        for (let pi = 1; pi <= pdf.numPages; pi++) {
+          const page = await pdf.getPage(pi);
+          const vp1 = page.getViewport({scale:.22}), vp2 = page.getViewport({scale:.19});
+          const c1 = document.createElement('canvas'); c1.width=vp1.width; c1.height=vp1.height;
+          await page.render({canvasContext:c1.getContext('2d'),viewport:vp1}).promise;
+          const c2 = document.createElement('canvas'); c2.width=vp2.width; c2.height=vp2.height;
+          await page.render({canvasContext:c2.getContext('2d'),viewport:vp2}).promise;
+          const idx = thumbData.length;
+          thumbData.push({canvas:c1, vCanvas:c2, fileIdx:fi, pageNum:pi});
+          pageOrder.push(idx); pageRotations.push(0);
+          appendThumbMulti(grid, c1, idx, `${file.name} — стр. ${pi}`, fi);
+          if (pi % 4 === 0) await yld();
+        }
+      } catch(e) { console.error(e); }
+    }
+  }
+
+  addingMsg.remove();
+  document.getElementById('thumbCount').textContent = `${thumbData.length} стр. · ${selFiles.length} файл(ов)`;
+  updatePanelMeta();
+  showToast(`✅ Добавлено: ${newFiles.map(f=>f.name).join(', ')}`);
+}
+
+function appendThumbMulti(grid, srcCanvas, pageIdx, label, fileIdx) {
+  const item = document.createElement('div');
+  item.className = 'thumb-item';
+  item.dataset.idx = pageIdx;
+  item.draggable = true;
+  item.title = `${label} — кликните для просмотра`;
+  item.onclick = e => { if (e.target.closest('.tmbtn')) return; selectThumb(item); openViewer(pageOrder.indexOf(pageIdx)+1); };
+
+  // Color stripe per file
+  const stripe = document.createElement('div');
+  const colors = ['#3b82f6','#22c55e','#a855f7','#f59e0b','#ef4444','#06b6d4'];
+  stripe.style.cssText = `height:3px;width:100%;background:${colors[fileIdx%colors.length]};flex-shrink:0`;
+
+  const cw = document.createElement('div'); cw.className = 'thumb-canvas-wrap';
+  const clone = cloneCanvas(srcCanvas); cw.appendChild(clone);
+
+  const lbl = document.createElement('div'); lbl.className = 'thumb-lbl';
+  lbl.dataset.n = pageIdx+1;
+  // truncate label
+  const shortLabel = label.length > 22 ? label.slice(0,20)+'…' : label;
+  lbl.textContent = curThumbView === 'list' ? shortLabel : `${pageIdx+1}`;
+  lbl.title = label;
+
+  const btns = document.createElement('div'); btns.className = 'thumb-btns';
+  const rotBtn = makeTmBtn('↻', `rotateThumbPage(${pageIdx})`, 'Повернуть');
+  const delBtn = makeTmBtn('🗑', `deleteThumbPage(${pageIdx})`, 'Удалить');
+  btns.appendChild(rotBtn); btns.appendChild(delBtn);
+
+  item.appendChild(stripe); item.appendChild(cw); item.appendChild(lbl); item.appendChild(btns);
+  grid.appendChild(item);
+}
+
+function updatePanelMeta() {
+  if (!selFiles.length) return;
+  const totalSize = selFiles.reduce((s,f)=>s+f.size,0);
+  document.getElementById('panelMeta').textContent = `${selFiles.length} файл(ов) · ${fmtSz(totalSize)}`;
 }
 
 function mkCanvas(img, targetW) {
@@ -1235,6 +1404,14 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 function yld(){return new Promise(r=>setTimeout(r,0));}
 function fmtSz(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function triggerAddMore() {
+  const cfg = TOOLS[curTool];
+  const fi = document.getElementById('file-input');
+  fi.accept = cfg.accept;
+  fi.multiple = true;
+  fi.click();
+}
+
 function resetAll(){
   selFiles=[];pdfDoc=null;thumbData=[];pageOrder=[];pageRotations=[];sigDataUrl=null;
   ['heroBlock','featuresBlock','dropZone'].forEach(id=>document.getElementById(id).style.display=id==='featuresBlock'?'grid':'block');
