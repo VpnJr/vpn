@@ -1107,7 +1107,21 @@ var importedRows = [];
 
 function openImportModal(){
   importedRows = [];
-  document.getElementById('import-file').value = '';
+  var fi = document.getElementById('import-file');
+  fi.value = '';
+  // Переустанавливаем listener каждый раз чтобы избежать дублей
+  fi.onchange = function(){
+    var file = this.files[0];
+    if(!file) return;
+    var nm = file.name.toLowerCase();
+    if(nm.endsWith('.csv')){
+      readCSV(file);
+    } else if(nm.endsWith('.xlsx') || nm.endsWith('.xls')){
+      readExcel(file);
+    } else {
+      showImportErr('Поддерживаются только .xlsx, .xls и .csv файлы');
+    }
+  };
   document.getElementById('import-preview').style.display = 'none';
   document.getElementById('import-err').style.display = 'none';
   document.getElementById('import-btn').disabled = true;
@@ -1115,24 +1129,14 @@ function openImportModal(){
 }
 function closeImportModal(){ document.getElementById('modal-import').style.display = 'none'; }
 
-document.getElementById('import-file').addEventListener('change', function(){
-  var file = this.files[0];
-  if(!file) return;
-  var name = file.name.toLowerCase();
-  if(name.endsWith('.csv')){
-    readCSV(file);
-  } else if(name.endsWith('.xlsx') || name.endsWith('.xls')){
-    readExcel(file);
-  } else {
-    showImportErr('Поддерживаются только .xlsx, .xls и .csv файлы');
-  }
-});
+// addEventListener вызывается из openImportModal чтобы элемент точно существовал
 
 function readCSV(file){
   var reader = new FileReader();
   reader.onload = function(e){
     var text = e.target.result;
-    var lines = text.split(/?
+    var lines = text.split(/
+?
 /).filter(function(l){ return l.trim(); });
     if(lines.length < 2){ showImportErr('Файл пустой или содержит только заголовки'); return; }
     var headers = parseCSVLine(lines[0]);
