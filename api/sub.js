@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   try {
-    const url = "https://your-durev.com/sub/JvMnOx5zGnJ2rO0IptyUkM/about/";
+    const url = "https://your-durev.com/sub/ZvsyXmESUjY1JXXtxY-XML";
 
     const response = await fetch(url);
     const encoded = await response.text();
